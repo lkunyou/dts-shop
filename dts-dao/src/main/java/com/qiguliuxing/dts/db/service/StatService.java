@@ -26,4 +26,16 @@ public class StatService {
 	public List<Map> statGoods() {
 		return statMapper.statGoods();
 	}
+
+	public List<Map> statSalesByGoods(String startDate, String endDate, Integer goodsId, Integer userId) {
+		return statMapper.statSalesByGoods(startDate, endDate, goodsId, userId);
+	}
+
+	public List<Map> statSalesByUser(String startDate, String endDate, Integer goodsId, Integer userId) {
+		return statMapper.statSalesByUser(startDate, endDate, goodsId, userId);
+	}
+
+	public List<Map> statSalesByMonth(String startDate, String endDate, Integer goodsId, Integer userId) {
+		return statMapper.statSalesByMonth(startDate, endDate, goodsId, userId);
+	}
 }

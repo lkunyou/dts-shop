@@ -28,4 +28,81 @@
         from dts_order_goods
         group by substr(add_time,1, 10)
     </select>
+
+    <select id="statSalesByGoods" resultType="map">
+        select
+        substr(o.add_time,1,10) as day,
+        og.goods_id as goodsId,
+        og.goods_name as goodsName,
+        sum(og.number) as salesCount,
+        sum(og.number * og.price) as amount
+        from dts_order o
+        inner join dts_order_goods og on o.id = og.order_id
+        where o.order_status in (201, 301, 401, 402)
+        <if test="startDate != null and startDate != ''">
+            and substr(o.add_time,1,10) &gt;= #{startDate}
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and substr(o.add_time,1,10) &lt;= #{endDate}
+        </if>
+        <if test="goodsId != null">
+            and og.goods_id = #{goodsId}
+        </if>
+        <if test="userId != null">
+            and o.user_id = #{userId}
+        </if>
+        group by substr(o.add_time,1,10), og.goods_id, og.goods_name
+        order by day desc, amount desc
+    </select>
+
+    <select id="statSalesByUser" resultType="map">
+        select
+        substr(o.add_time,1,10) as day,
+        o.user_id as userId,
+        u.username as username,
+        sum(og.number) as salesCount,
+        sum(og.number * og.price) as amount
+        from dts_order o
+        inner join dts_order_goods og on o.id = og.order_id
+        inner join dts_user u on o.user_id = u.id
+        where o.order_status in (201, 301, 401, 402)
+        <if test="startDate != null and startDate != ''">
+            and substr(o.add_time,1,10) &gt;= #{startDate}
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and substr(o.add_time,1,10) &lt;= #{endDate}
+        </if>
+        <if test="goodsId != null">
+            and og.goods_id = #{goodsId}
+        </if>
+        <if test="userId != null">
+            and o.user_id = #{userId}
+        </if>
+        group by substr(o.add_time,1,10), o.user_id, u.username
+        order by day desc, amount desc
+    </select>
+
+    <select id="statSalesByMonth" resultType="map">
+        select
+        substr(o.add_time,1,7) as month,
+        sum(og.number) as salesCount,
+        sum(og.number * og.price) as amount
+        from dts_order o
+        inner join dts_order_goods og on o.id = og.order_id
+        where o.order_status in (201, 301, 401, 402)
+        <if test="startDate != null and startDate != ''">
+            and substr(o.add_time,1,10) &gt;= #{startDate}
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and substr(o.add_time,1,10) &lt;= #{endDate}
+        </if>
+        <if test="goodsId != null">
+            and og.goods_id = #{goodsId}
+        </if>
+        <if test="userId != null">
+            and o.user_id = #{userId}
+        </if>
+        group by substr(o.add_time,1,7)
+        order by month desc
+    </select>
 </mapper>

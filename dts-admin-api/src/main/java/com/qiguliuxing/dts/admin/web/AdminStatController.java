@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.alibaba.fastjson.JSONObject;
@@ -73,6 +74,69 @@ public class AdminStatController {
 		statVo.setRows(rows);
 
 		logger.info("【请求结束】统计管理->商品统计->查询,响应结果:{}", JSONObject.toJSONString(statVo));
+		return ResponseUtil.ok(statVo);
+	}
+
+	@RequiresPermissions("admin:stat:sales")
+	@RequiresPermissionsDesc(menu = { "统计管理", "销售报表" }, button = "按商品统计")
+	@GetMapping("/sales/goods")
+	public Object statSalesByGoods(
+			@RequestParam(required = false) String startDate,
+			@RequestParam(required = false) String endDate,
+			@RequestParam(required = false) Integer goodsId,
+			@RequestParam(required = false) Integer userId) {
+		logger.info("【请求开始】统计管理->销售报表->按商品统计,参数:startDate={},endDate={},goodsId={},userId={}",
+				startDate, endDate, goodsId, userId);
+
+		List<Map> rows = statService.statSalesByGoods(startDate, endDate, goodsId, userId);
+		String[] columns = new String[] { "day", "goodsId", "goodsName", "salesCount", "amount" };
+		StatVo statVo = new StatVo();
+		statVo.setColumns(columns);
+		statVo.setRows(rows);
+
+		logger.info("【请求结束】统计管理->销售报表->按商品统计,响应结果:{}", JSONObject.toJSONString(statVo));
+		return ResponseUtil.ok(statVo);
+	}
+
+	@RequiresPermissions("admin:stat:sales")
+	@RequiresPermissionsDesc(menu = { "统计管理", "销售报表" }, button = "按用户统计")
+	@GetMapping("/sales/user")
+	public Object statSalesByUser(
+			@RequestParam(required = false) String startDate,
+			@RequestParam(required = false) String endDate,
+			@RequestParam(required = false) Integer goodsId,
+			@RequestParam(required = false) Integer userId) {
+		logger.info("【请求开始】统计管理->销售报表->按用户统计,参数:startDate={},endDate={},goodsId={},userId={}",
+				startDate, endDate, goodsId, userId);
+
+		List<Map> rows = statService.statSalesByUser(startDate, endDate, goodsId, userId);
+		String[] columns = new String[] { "day", "userId", "username", "salesCount", "amount" };
+		StatVo statVo = new StatVo();
+		statVo.setColumns(columns);
+		statVo.setRows(rows);
+
+		logger.info("【请求结束】统计管理->销售报表->按用户统计,响应结果:{}", JSONObject.toJSONString(statVo));
+		return ResponseUtil.ok(statVo);
+	}
+
+	@RequiresPermissions("admin:stat:sales")
+	@RequiresPermissionsDesc(menu = { "统计管理", "销售报表" }, button = "按月份统计")
+	@GetMapping("/sales/month")
+	public Object statSalesByMonth(
+			@RequestParam(required = false) String startDate,
+			@RequestParam(required = false) String endDate,
+			@RequestParam(required = false) Integer goodsId,
+			@RequestParam(required = false) Integer userId) {
+		logger.info("【请求开始】统计管理->销售报表->按月份统计,参数:startDate={},endDate={},goodsId={},userId={}",
+				startDate, endDate, goodsId, userId);
+
+		List<Map> rows = statService.statSalesByMonth(startDate, endDate, goodsId, userId);
+		String[] columns = new String[] { "month", "salesCount", "amount" };
+		StatVo statVo = new StatVo();
+		statVo.setColumns(columns);
+		statVo.setRows(rows);
+
+		logger.info("【请求结束】统计管理->销售报表->按月份统计,响应结果:{}", JSONObject.toJSONString(statVo));
 		return ResponseUtil.ok(statVo);
 	}
 
