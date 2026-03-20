@@ -2,6 +2,7 @@ package com.qiguliuxing.dts.db.service;
 
 import com.github.pagehelper.PageHelper;
 import com.qiguliuxing.dts.db.dao.DtsCouponUserMapper;
+import com.qiguliuxing.dts.db.dao.ex.CouponUserMapper;
 import com.qiguliuxing.dts.db.domain.DtsCouponUser;
 import com.qiguliuxing.dts.db.domain.DtsCouponUserExample;
 import com.qiguliuxing.dts.db.util.CouponUserConstant;
@@ -19,6 +20,8 @@ import java.util.List;
 public class DtsCouponUserService {
 	@Resource
 	private DtsCouponUserMapper couponUserMapper;
+	@Resource
+	private CouponUserMapper couponUserExMapper;
 
 	public Integer countCoupon(Integer couponId) {
 		DtsCouponUserExample example = new DtsCouponUserExample();
@@ -95,5 +98,10 @@ public class DtsCouponUserService {
 		example.or().andStatusEqualTo(CouponUserConstant.STATUS_USABLE).andEndTimeLessThan(LocalDate.now())
 				.andDeletedEqualTo(false);
 		return couponUserMapper.selectByExample(example);
+	}
+
+	public int useCouponCAS(Integer couponUserId, String orderSn) {
+		return couponUserExMapper.useCouponCAS(couponUserId, orderSn, LocalDateTime.now(),
+				CouponUserConstant.STATUS_USABLE, CouponUserConstant.STATUS_USED);
 	}
 }
