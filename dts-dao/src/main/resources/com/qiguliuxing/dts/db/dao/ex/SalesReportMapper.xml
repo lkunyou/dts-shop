@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.qiguliuxing.dts.db.dao.ex.SalesReportMapper">
+
+    <resultMap id="GoodsSalesReportResult" type="com.qiguliuxing.dts.admin.vo.GoodsSalesReportVo">
+        <result column="goods_id" property="goodsId"/>
+        <result column="goods_name" property="goodsName"/>
+        <result column="total_amount" property="totalAmount"/>
+        <result column="total_quantity" property="totalQuantity"/>
+        <result column="order_date" property="orderDate"/>
+    </resultMap>
+
+    <resultMap id="UserSalesReportResult" type="com.qiguliuxing.dts.admin.vo.UserSalesReportVo">
+        <result column="user_id" property="userId"/>
+        <result column="user_name" property="userName"/>
+        <result column="user_nick_name" property="userNickName"/>
+        <result column="total_amount" property="totalAmount"/>
+        <result column="total_quantity" property="totalQuantity"/>
+        <result column="order_date" property="orderDate"/>
+    </resultMap>
+
+    <resultMap id="MonthSalesReportResult" type="com.qiguliuxing.dts.admin.vo.MonthSalesReportVo">
+        <result column="total_amount" property="totalAmount"/>
+        <result column="total_quantity" property="totalQuantity"/>
+        <result column="order_date" property="orderDate"/>
+    </resultMap>
+
+    <select id="selectSalesReportByGoods" resultMap="GoodsSalesReportResult">
+        SELECT
+            og.goods_id as goods_id,
+            og.goods_name as goods_name,
+            SUM(og.number * og.price) as total_amount,
+            SUM(og.number) as total_quantity,
+            DATE(o.add_time) as order_date
+        FROM dts_order_goods og
+        INNER JOIN dts_order o ON og.order_id = o.id
+        WHERE o.order_status IN
+        <foreach collection="orderStatusList" item="status" open="(" separator="," close=")">
+            #{status}
+        </foreach>
+        <if test="startDate != null">
+            AND DATE(o.add_time) >= #{startDate}
+        </if>
+        <if test="endDate != null">
+            AND DATE(o.add_time) &lt;= #{endDate}
+        </if>
+        <if test="goodsId != null">
+            AND og.goods_id = #{goodsId}
+        </if>
+        <if test="userId != null">
+            AND o.user_id = #{userId}
+        </if>
+        AND o.deleted = 0
+        GROUP BY og.goods_id, og.goods_name, DATE(o.add_time)
+        ORDER BY order_date DESC, total_amount DESC
+    </select>
+
+    <select id="selectSalesReportByUser" resultMap="UserSalesReportResult">
+        SELECT
+            o.user_id as user_id,
+            u.username as user_name,
+            u.nickname as user_nick_name,
+            SUM(og.number * og.price) as total_amount,
+            SUM(og.number) as total_quantity,
+            DATE(o.add_time) as order_date
+        FROM dts_order_goods og
+        INNER JOIN dts_order o ON og.order_id = o.id
+        LEFT JOIN dts_user u ON o.user_id = u.id
+        WHERE o.order_status IN
+        <foreach collection="orderStatusList" item="status" open="(" separator="," close=")">
+            #{status}
+        </foreach>
+        <if test="startDate != null">
+            AND DATE(o.add_time) >= #{startDate}
+        </if>
+        <if test="endDate != null">
+            AND DATE(o.add_time) &lt;= #{endDate}
+        </if>
+        <if test="goodsId != null">
+            AND og.goods_id = #{goodsId}
+        </if>
+        <if test="userId != null">
+            AND o.user_id = #{userId}
+        </if>
+        AND o.deleted = 0
+        GROUP BY o.user_id, u.username, u.nickname, DATE(o.add_time)
+        ORDER BY order_date DESC, total_amount DESC
+    </select>
+
+    <select id="selectSalesReportByMonth" resultMap="MonthSalesReportResult">
+        SELECT
+            SUM(og.number * og.price) as total_amount,
+            SUM(og.number) as total_quantity,
+            DATE_FORMAT(o.add_time, '%Y-%m-01') as order_date
+        FROM dts_order_goods og
+        INNER JOIN dts_order o ON og.order_id = o.id
+        WHERE o.order_status IN
+        <foreach collection="orderStatusList" item="status" open="(" separator="," close=")">
+            #{status}
+        </foreach>
+        <if test="startDate != null">
+            AND DATE(o.add_time) >= #{startDate}
+        </if>
+        <if test="endDate != null">
+            AND DATE(o.add_time) &lt;= #{endDate}
+        </if>
+        <if test="goodsId != null">
+            AND og.goods_id = #{goodsId}
+        </if>
+        <if test="userId != null">
+            AND o.user_id = #{userId}
+        </if>
+        AND o.deleted = 0
+        GROUP BY DATE_FORMAT(o.add_time, '%Y-%m')
+        ORDER BY order_date DESC
+    </select>
+
+</mapper>
