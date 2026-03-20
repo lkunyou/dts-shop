@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.qiguliuxing.dts.db.dao.ex.CouponUserMapper">
+    <update id="useCouponCAS" parameterType="map">
+        update dts_coupon_user
+        set `status` = #{newStatus,jdbcType=SMALLINT},
+            used_time = #{usedTime,jdbcType=TIMESTAMP},
+            order_sn = #{orderSn,jdbcType=VARCHAR},
+            update_time = now()
+        where id = #{id,jdbcType=INTEGER}
+          and `status` = #{oldStatus,jdbcType=SMALLINT}
+          and deleted = 0
+    </update>
+</mapper>

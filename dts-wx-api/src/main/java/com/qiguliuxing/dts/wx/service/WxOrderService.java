@@ -147,6 +147,29 @@ public class WxOrderService {
 	@Autowired
 	private DtsAccountService accountService;
 
+	private static class SubmitOrderContext {
+		Integer cartId;
+		Integer addressId;
+		Integer couponId;
+		String message;
+		Integer grouponRulesId;
+		Integer grouponLinkId;
+		DtsAddress checkedAddress;
+		DtsGrouponRules grouponRules;
+		BigDecimal grouponPrice;
+		List<DtsCart> checkedGoodsList;
+		BigDecimal goodsTotalPrice;
+		BigDecimal totalFreightPrice;
+		BigDecimal couponPrice;
+		BigDecimal integralPrice;
+		BigDecimal orderTotalPrice;
+		BigDecimal actualPrice;
+		Integer shareUserId;
+		Integer settlementRate;
+		DtsCouponUser couponUser;
+		String detailedAddress;
+	}
+
 	private String detailedAddress(DtsAddress DtsAddress) {
 		Integer provinceId = DtsAddress.getProvinceId();
 		Integer cityId = DtsAddress.getCityId();
@@ -294,6 +317,8 @@ public class WxOrderService {
 	 * 提交订单
 	 * <p>
 	 * 1. 创建订单表项和订单商品表项; 2. 购物车清空; 3. 优惠券设置已用; 4. 商品货品库存减少; 5. 如果是团购商品，则创建团购活动表项。
+	 * <p>
+	 * 优化：将查询操作移出事务，减少事务持有时间
 	 *
 	 * @param userId
 	 *            用户ID
@@ -302,7 +327,6 @@ public class WxOrderService {
 	 *            grouponRulesId: xxx, grouponLinkId: xxx}
 	 * @return 提交订单操作结果
 	 */
-	@Transactional
 	public Object submit(Integer userId, String body) {
 		if (userId == null) {
 			logger.error("提交订单详情失败：用户未登录!");
@@ -311,64 +335,76 @@ public class WxOrderService {
 		if (body == null) {
 			return ResponseUtil.badArgument();
 		}
-		Integer cartId = JacksonUtil.parseInteger(body, "cartId");
-		Integer addressId = JacksonUtil.parseInteger(body, "addressId");
-		Integer couponId = JacksonUtil.parseInteger(body, "couponId");
-		String message = JacksonUtil.parseString(body, "message");
-		Integer grouponRulesId = JacksonUtil.parseInteger(body, "grouponRulesId");
-		Integer grouponLinkId = JacksonUtil.parseInteger(body, "grouponLinkId");
 
-		// 如果是团购项目,验证活动是否有效
-		if (grouponRulesId != null && grouponRulesId > 0) {
-			DtsGrouponRules rules = grouponRulesService.queryById(grouponRulesId);
-			// 找不到记录
+		SubmitOrderContext ctx = prepareSubmit(userId, body);
+		if (ctx == null) {
+			return ResponseUtil.badArgument();
+		}
+
+		Object validationResult = validateAndPrepareContext(userId, ctx);
+		if (validationResult != null) {
+			return validationResult;
+		}
+
+		return doSubmit(userId, ctx);
+	}
+
+	private SubmitOrderContext prepareSubmit(Integer userId, String body) {
+		SubmitOrderContext ctx = new SubmitOrderContext();
+		ctx.cartId = JacksonUtil.parseInteger(body, "cartId");
+		ctx.addressId = JacksonUtil.parseInteger(body, "addressId");
+		ctx.couponId = JacksonUtil.parseInteger(body, "couponId");
+		ctx.message = JacksonUtil.parseString(body, "message");
+		ctx.grouponRulesId = JacksonUtil.parseInteger(body, "grouponRulesId");
+		ctx.grouponLinkId = JacksonUtil.parseInteger(body, "grouponLinkId");
+
+		if (ctx.cartId == null || ctx.addressId == null || ctx.couponId == null) {
+			return null;
+		}
+		return ctx;
+	}
+
+	private Object validateAndPrepareContext(Integer userId, SubmitOrderContext ctx) {
+		if (ctx.grouponRulesId != null && ctx.grouponRulesId > 0) {
+			DtsGrouponRules rules = grouponRulesService.queryById(ctx.grouponRulesId);
 			if (rules == null) {
 				return ResponseUtil.badArgument();
 			}
-			// 团购活动已经过期
 			if (grouponRulesService.isExpired(rules)) {
 				logger.error("提交订单详情失败：{}", GROUPON_EXPIRED.desc());
 				return WxResponseUtil.fail(GROUPON_EXPIRED);
 			}
 		}
 
-		if (cartId == null || addressId == null || couponId == null) {
+		ctx.checkedAddress = addressService.findById(ctx.addressId);
+		if (ctx.checkedAddress == null) {
 			return ResponseUtil.badArgument();
 		}
+		ctx.detailedAddress = detailedAddress(ctx.checkedAddress);
 
-		// 收货地址
-		DtsAddress checkedAddress = addressService.findById(addressId);
-		if (checkedAddress == null) {
-			return ResponseUtil.badArgument();
+		ctx.grouponPrice = new BigDecimal(0.00);
+		ctx.grouponRules = grouponRulesService.queryById(ctx.grouponRulesId);
+		if (ctx.grouponRules != null) {
+			ctx.grouponPrice = ctx.grouponRules.getDiscount();
 		}
 
-		// 团购优惠
-		BigDecimal grouponPrice = new BigDecimal(0.00);
-		DtsGrouponRules grouponRules = grouponRulesService.queryById(grouponRulesId);
-		if (grouponRules != null) {
-			grouponPrice = grouponRules.getDiscount();
-		}
-
-		// 货品价格
-		List<DtsCart> checkedGoodsList = null;
-		if (cartId.equals(0)) {
-			checkedGoodsList = cartService.queryByUidAndChecked(userId);
+		if (ctx.cartId.equals(0)) {
+			ctx.checkedGoodsList = cartService.queryByUidAndChecked(userId);
 		} else {
-			DtsCart cart = cartService.findById(cartId);
-			checkedGoodsList = new ArrayList<>(1);
-			checkedGoodsList.add(cart);
+			DtsCart cart = cartService.findById(ctx.cartId);
+			ctx.checkedGoodsList = new ArrayList<>(1);
+			ctx.checkedGoodsList.add(cart);
 		}
-		if (checkedGoodsList.size() == 0) {
+		if (ctx.checkedGoodsList.size() == 0) {
 			return ResponseUtil.badArgumentValue();
 		}
 
-		BigDecimal goodsTotalPrice = new BigDecimal(0.00);// 商品总价 （包含团购减免，即减免团购后的商品总价，多店铺需将所有商品相加）
-		BigDecimal totalFreightPrice = new BigDecimal(0.00);// 总配送费 （单店铺模式一个，多店铺模式多个配送费的总和）
-		// 如果需要拆订单，则按店铺进行归类，在计算邮费
+		ctx.goodsTotalPrice = new BigDecimal(0.00);
+		ctx.totalFreightPrice = new BigDecimal(0.00);
+
 		if (SystemConfig.isMultiOrderModel()) {
-			// a.按入驻店铺归类checkout商品
 			List<BrandCartGoods> brandCartgoodsList = new ArrayList<BrandCartGoods>();
-			for (DtsCart cart : checkedGoodsList) {
+			for (DtsCart cart : ctx.checkedGoodsList) {
 				Integer brandId = cart.getBrandId();
 				boolean hasExsist = false;
 				for (int i = 0; i < brandCartgoodsList.size(); i++) {
@@ -378,7 +414,7 @@ public class WxOrderService {
 						break;
 					}
 				}
-				if (!hasExsist) {// 还尚未加入，则新增一类
+				if (!hasExsist) {
 					BrandCartGoods bandCartGoods = new BrandCartGoods();
 					bandCartGoods.setBrandId(brandId);
 					List<DtsCart> dtsCartList = new ArrayList<DtsCart>();
@@ -387,113 +423,99 @@ public class WxOrderService {
 					brandCartgoodsList.add(bandCartGoods);
 				}
 			}
-			// b.核算每个店铺的商品总价，用于计算邮费
 			for (BrandCartGoods bcg : brandCartgoodsList) {
 				List<DtsCart> bandCarts = bcg.getCartList();
 				BigDecimal bandGoodsTotalPrice = new BigDecimal(0.00);
 				BigDecimal bandFreightPrice = new BigDecimal(0.00);
-				for (DtsCart cart : bandCarts) {// 循环店铺各自的购物商品
-					// 只有当团购规格商品ID符合才进行团购优惠
-					if (grouponRules != null && grouponRules.getGoodsId().equals(cart.getGoodsId())) {
+				for (DtsCart cart : bandCarts) {
+					if (ctx.grouponRules != null && ctx.grouponRules.getGoodsId().equals(cart.getGoodsId())) {
 						bandGoodsTotalPrice = bandGoodsTotalPrice
-								.add(cart.getPrice().subtract(grouponPrice).multiply(new BigDecimal(cart.getNumber())));
+								.add(cart.getPrice().subtract(ctx.grouponPrice).multiply(new BigDecimal(cart.getNumber())));
 					} else {
 						bandGoodsTotalPrice = bandGoodsTotalPrice
 								.add(cart.getPrice().multiply(new BigDecimal(cart.getNumber())));
 					}
 				}
-
-				// 每个店铺都单独计算运费，满66则免运费，否则6元；
 				if (bandGoodsTotalPrice.compareTo(SystemConfig.getFreightLimit()) < 0) {
 					bandFreightPrice = SystemConfig.getFreight();
 				}
-				goodsTotalPrice = goodsTotalPrice.add(bandGoodsTotalPrice);
-				totalFreightPrice = totalFreightPrice.add(bandFreightPrice);
+				ctx.goodsTotalPrice = ctx.goodsTotalPrice.add(bandGoodsTotalPrice);
+				ctx.totalFreightPrice = ctx.totalFreightPrice.add(bandFreightPrice);
 			}
-		} else {// 单个店铺模式
-			for (DtsCart checkGoods : checkedGoodsList) {
-				// 只有当团购规格商品ID符合才进行团购优惠
-				if (grouponRules != null && grouponRules.getGoodsId().equals(checkGoods.getGoodsId())) {
-					goodsTotalPrice = goodsTotalPrice.add(checkGoods.getPrice().subtract(grouponPrice)
+		} else {
+			for (DtsCart checkGoods : ctx.checkedGoodsList) {
+				if (ctx.grouponRules != null && ctx.grouponRules.getGoodsId().equals(checkGoods.getGoodsId())) {
+					ctx.goodsTotalPrice = ctx.goodsTotalPrice.add(checkGoods.getPrice().subtract(ctx.grouponPrice)
 							.multiply(new BigDecimal(checkGoods.getNumber())));
 				} else {
-					goodsTotalPrice = goodsTotalPrice
+					ctx.goodsTotalPrice = ctx.goodsTotalPrice
 							.add(checkGoods.getPrice().multiply(new BigDecimal(checkGoods.getNumber())));
 				}
 			}
-			// 根据订单商品总价计算运费，满足条件（例如66元）则免运费，否则需要支付运费（例如6元）；
-			if (goodsTotalPrice.compareTo(SystemConfig.getFreightLimit()) < 0) {
-				totalFreightPrice = SystemConfig.getFreight();
+			if (ctx.goodsTotalPrice.compareTo(SystemConfig.getFreightLimit()) < 0) {
+				ctx.totalFreightPrice = SystemConfig.getFreight();
 			}
 		}
 
-		// 获取可用的优惠券信息 使用优惠券减免的金额
-		BigDecimal couponPrice = new BigDecimal(0.00);
-		// 如果couponId=0则没有优惠券，couponId=-1则不使用优惠券
-		if (couponId != 0 && couponId != -1) {
-			DtsCoupon coupon = couponVerifyService.checkCoupon(userId, couponId, goodsTotalPrice);
+		ctx.couponPrice = new BigDecimal(0.00);
+		if (ctx.couponId != 0 && ctx.couponId != -1) {
+			DtsCoupon coupon = couponVerifyService.checkCoupon(userId, ctx.couponId, ctx.goodsTotalPrice);
 			if (coupon == null) {
 				return ResponseUtil.badArgumentValue();
 			}
-			couponPrice = coupon.getDiscount();
+			ctx.couponPrice = coupon.getDiscount();
+			ctx.couponUser = couponUserService.queryOne(userId, ctx.couponId);
 		}
 
-		// 可以使用的其他钱，例如用户积分
-		BigDecimal integralPrice = new BigDecimal(0.00);
+		ctx.integralPrice = new BigDecimal(0.00);
+		ctx.orderTotalPrice = ctx.goodsTotalPrice.add(ctx.totalFreightPrice).subtract(ctx.couponPrice);
+		ctx.actualPrice = ctx.orderTotalPrice.subtract(ctx.integralPrice);
 
-		// 订单费用
-		BigDecimal orderTotalPrice = goodsTotalPrice.add(totalFreightPrice).subtract(couponPrice);
-		// 最终支付费用
-		BigDecimal actualPrice = orderTotalPrice.subtract(integralPrice);
+		DtsUser user = userService.findById(userId);
+		ctx.shareUserId = 1;
+		if (user != null && user.getShareUserId() != null) {
+			ctx.shareUserId = user.getShareUserId();
+		}
+		ctx.settlementRate = 3;
+		DtsUserAccount userAccount = accountService.findShareUserAccountByUserId(ctx.shareUserId);
+		if (userAccount != null && userAccount.getSettlementRate() > 0 && userAccount.getSettlementRate() < 15) {
+			ctx.settlementRate = userAccount.getSettlementRate();
+		}
 
-		Integer orderId = null;
-		DtsOrder order = null;
-		// 订单
-		order = new DtsOrder();
+		return null;
+	}
+
+	@Transactional
+	public Object doSubmit(Integer userId, SubmitOrderContext ctx) {
+		DtsOrder order = new DtsOrder();
 		order.setUserId(userId);
 		order.setOrderSn(orderService.generateOrderSn(userId));
 		order.setOrderStatus(OrderUtil.STATUS_CREATE);
-		order.setConsignee(checkedAddress.getName());
-		order.setMobile(checkedAddress.getMobile());
-		order.setMessage(message);
-		String detailedAddress = detailedAddress(checkedAddress);
-		order.setAddress(detailedAddress);
-		order.setGoodsPrice(goodsTotalPrice);
-		order.setFreightPrice(totalFreightPrice);
-		order.setCouponPrice(couponPrice);
-		order.setIntegralPrice(integralPrice);
-		order.setOrderPrice(orderTotalPrice);
-		order.setActualPrice(actualPrice);
+		order.setConsignee(ctx.checkedAddress.getName());
+		order.setMobile(ctx.checkedAddress.getMobile());
+		order.setMessage(ctx.message);
+		order.setAddress(ctx.detailedAddress);
+		order.setGoodsPrice(ctx.goodsTotalPrice);
+		order.setFreightPrice(ctx.totalFreightPrice);
+		order.setCouponPrice(ctx.couponPrice);
+		order.setIntegralPrice(ctx.integralPrice);
+		order.setOrderPrice(ctx.orderTotalPrice);
+		order.setActualPrice(ctx.actualPrice);
 
-		// 有团购活动
-		if (grouponRules != null) {
-			order.setGrouponPrice(grouponPrice); // 团购价格
+		if (ctx.grouponRules != null) {
+			order.setGrouponPrice(ctx.grouponPrice);
 		} else {
-			order.setGrouponPrice(new BigDecimal(0.00)); // 团购价格
+			order.setGrouponPrice(new BigDecimal(0.00));
 		}
 
-		// 新增代理的结算金额计算
-		DtsUser user = userService.findById(userId);
-		Integer shareUserId = 1;//
-		if (user != null && user.getShareUserId() != null) {
-			shareUserId = user.getShareUserId();
-		}
-		Integer settlementRate = 3;// 默认百分之3
-		DtsUserAccount userAccount = accountService.findShareUserAccountByUserId(shareUserId);
-		if (userAccount != null && userAccount.getSettlementRate() > 0 && userAccount.getSettlementRate() < 15) {
-			settlementRate = userAccount.getSettlementRate();
-		}
-		BigDecimal rate = new BigDecimal(settlementRate * 0.01);
-		BigDecimal settlementMoney = (actualPrice.subtract(totalFreightPrice)).multiply(rate);
+		BigDecimal rate = new BigDecimal(ctx.settlementRate * 0.01);
+		BigDecimal settlementMoney = (ctx.actualPrice.subtract(ctx.totalFreightPrice)).multiply(rate);
 		order.setSettlementMoney(settlementMoney.setScale(2, BigDecimal.ROUND_DOWN));
 
-		// 添加订单表项
 		orderService.add(order);
-		orderId = order.getId();
+		Integer orderId = order.getId();
 
-		// 添加订单商品表项
-		for (DtsCart cartGoods : checkedGoodsList) {
-			// 订单商品
+		for (DtsCart cartGoods : ctx.checkedGoodsList) {
 			DtsOrderGoods orderGoods = new DtsOrderGoods();
 			orderGoods.setOrderId(order.getId());
 			orderGoods.setGoodsId(cartGoods.getGoodsId());
@@ -505,52 +527,43 @@ public class WxOrderService {
 			orderGoods.setNumber(cartGoods.getNumber());
 			orderGoods.setSpecifications(cartGoods.getSpecifications());
 			orderGoods.setAddTime(LocalDateTime.now());
-
-			orderGoods.setBrandId(cartGoods.getBrandId());// 订单商品需加上入驻店铺标志
-
+			orderGoods.setBrandId(cartGoods.getBrandId());
 			orderGoodsService.add(orderGoods);
 		}
 
-		// 删除购物车里面的商品信息
-		cartService.clearGoods(userId);
+		if (ctx.cartId.equals(0)) {
+			cartService.clearGoods(userId);
+		} else {
+			for (DtsCart cartGoods : ctx.checkedGoodsList) {
+				cartService.deleteById(cartGoods.getId());
+			}
+		}
 
-		// 商品货品数量减少
-		for (DtsCart checkGoods : checkedGoodsList) {
+		for (DtsCart checkGoods : ctx.checkedGoodsList) {
 			Integer productId = checkGoods.getProductId();
-			DtsGoodsProduct product = productService.findById(productId);
-
-			Integer remainNumber = product.getNumber() - checkGoods.getNumber();
-			if (remainNumber < 0) {
-				throw new RuntimeException("下单的商品货品数量大于库存量");
-			}
 			if (productService.reduceStock(productId, checkGoods.getGoodsId(), checkGoods.getNumber()) == 0) {
-				throw new RuntimeException("商品货品库存减少失败");
+				throw new RuntimeException("商品货品库存不足，下单失败");
 			}
 		}
 
-		// 如果使用了优惠券，设置优惠券使用状态
-		if (couponId != 0 && couponId != -1) {
-			DtsCouponUser couponUser = couponUserService.queryOne(userId, couponId);
-			couponUser.setStatus(CouponUserConstant.STATUS_USED);
-			couponUser.setUsedTime(LocalDateTime.now());
-			couponUser.setOrderSn(order.getOrderSn());
-			couponUserService.update(couponUser);
+		if (ctx.couponId != 0 && ctx.couponId != -1 && ctx.couponUser != null) {
+			int updateResult = couponUserService.useCouponCAS(ctx.couponUser.getId(), order.getOrderSn());
+			if (updateResult == 0) {
+				throw new RuntimeException("优惠券已被使用或状态异常");
+			}
 		}
 
-		// 如果是团购项目，添加团购信息
-		if (grouponRulesId != null && grouponRulesId > 0) {
+		if (ctx.grouponRulesId != null && ctx.grouponRulesId > 0) {
 			DtsGroupon groupon = new DtsGroupon();
 			groupon.setOrderId(orderId);
 			groupon.setPayed(false);
 			groupon.setUserId(userId);
-			groupon.setRulesId(grouponRulesId);
+			groupon.setRulesId(ctx.grouponRulesId);
 
-			// 参与者
-			if (grouponLinkId != null && grouponLinkId > 0) {
-				// 参与的团购记录
-				DtsGroupon baseGroupon = grouponService.queryById(grouponLinkId);
+			if (ctx.grouponLinkId != null && ctx.grouponLinkId > 0) {
+				DtsGroupon baseGroupon = grouponService.queryById(ctx.grouponLinkId);
 				groupon.setCreatorUserId(baseGroupon.getCreatorUserId());
-				groupon.setGrouponId(grouponLinkId);
+				groupon.setGrouponId(ctx.grouponLinkId);
 				groupon.setShareUrl(baseGroupon.getShareUrl());
 			} else {
 				groupon.setCreatorUserId(userId);
