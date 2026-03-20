@@ -28,4 +28,85 @@
         from dts_order_goods
         group by substr(add_time,1, 10)
     </select>
+
+    <!-- 按商品统计销售报表 -->
+    <select id="statSaleByGoods" resultType="map">
+        select
+        g.id as goods_id,
+        g.name as goods_name,
+        substr(o.add_time,1,10) as day,
+        sum(og.number) as sales_volume,
+        sum(og.number * og.price) as order_amount
+        from dts_order o
+        inner join dts_order_goods og on o.id = og.order_id
+        inner join dts_goods g on og.goods_id = g.id
+        where o.order_status in(201, 301, 401, 402)
+        <if test="startDate != null and startDate != ''">
+            and substr(o.add_time,1,10) >= #{startDate}
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and substr(o.add_time,1,10) &lt;= #{endDate}
+        </if>
+        <if test="goodsId != null">
+            and g.id = #{goodsId}
+        </if>
+        <if test="userId != null">
+            and o.user_id = #{userId}
+        </if>
+        group by g.id, g.name, substr(o.add_time,1,10)
+        order by day desc, order_amount desc
+    </select>
+
+    <!-- 按用户统计销售报表 -->
+    <select id="statSaleByUser" resultType="map">
+        select
+        u.id as user_id,
+        u.username as user_name,
+        substr(o.add_time,1,10) as day,
+        sum(og.number) as sales_volume,
+        sum(og.number * og.price) as order_amount
+        from dts_order o
+        inner join dts_order_goods og on o.id = og.order_id
+        inner join dts_user u on o.user_id = u.id
+        where o.order_status in(201, 301, 401, 402)
+        <if test="startDate != null and startDate != ''">
+            and substr(o.add_time,1,10) >= #{startDate}
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and substr(o.add_time,1,10) &lt;= #{endDate}
+        </if>
+        <if test="goodsId != null">
+            and og.goods_id = #{goodsId}
+        </if>
+        <if test="userId != null">
+            and u.id = #{userId}
+        </if>
+        group by u.id, u.username, substr(o.add_time,1,10)
+        order by day desc, order_amount desc
+    </select>
+
+    <!-- 按月份统计销售报表 -->
+    <select id="statSaleByMonth" resultType="map">
+        select
+        substr(o.add_time,1,7) as month,
+        sum(og.number) as sales_volume,
+        sum(og.number * og.price) as order_amount
+        from dts_order o
+        inner join dts_order_goods og on o.id = og.order_id
+        where o.order_status in(201, 301, 401, 402)
+        <if test="startDate != null and startDate != ''">
+            and substr(o.add_time,1,10) >= #{startDate}
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and substr(o.add_time,1,10) &lt;= #{endDate}
+        </if>
+        <if test="goodsId != null">
+            and og.goods_id = #{goodsId}
+        </if>
+        <if test="userId != null">
+            and o.user_id = #{userId}
+        </if>
+        group by substr(o.add_time,1,7)
+        order by month desc
+    </select>
 </mapper>
