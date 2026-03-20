@@ -27,39 +27,15 @@ public class StatService {
 		return statMapper.statGoods();
 	}
 
-	/**
-	 * 按商品统计销售报表
-	 * @param startDate 开始日期
-	 * @param endDate 结束日期
-	 * @param goodsId 商品ID（可选）
-	 * @param userId 用户ID（可选）
-	 * @return 商品销售统计数据
-	 */
-	public List<Map> statSaleByGoods(String startDate, String endDate, Integer goodsId, Integer userId) {
-		return statMapper.statSaleByGoods(startDate, endDate, goodsId, userId);
+	public List<Map> statSalesByGoods(String startDate, String endDate, Integer goodsId, Integer userId) {
+		return statMapper.statSalesByGoods(startDate, endDate, goodsId, userId);
 	}
 
-	/**
-	 * 按用户统计销售报表
-	 * @param startDate 开始日期
-	 * @param endDate 结束日期
-	 * @param goodsId 商品ID（可选）
-	 * @param userId 用户ID（可选）
-	 * @return 用户销售统计数据
-	 */
-	public List<Map> statSaleByUser(String startDate, String endDate, Integer goodsId, Integer userId) {
-		return statMapper.statSaleByUser(startDate, endDate, goodsId, userId);
+	public List<Map> statSalesByUser(String startDate, String endDate, Integer goodsId, Integer userId) {
+		return statMapper.statSalesByUser(startDate, endDate, goodsId, userId);
 	}
 
-	/**
-	 * 按月份统计销售报表
-	 * @param startDate 开始日期
-	 * @param endDate 结束日期
-	 * @param goodsId 商品ID（可选）
-	 * @param userId 用户ID（可选）
-	 * @return 月份销售统计数据
-	 */
-	public List<Map> statSaleByMonth(String startDate, String endDate, Integer goodsId, Integer userId) {
-		return statMapper.statSaleByMonth(startDate, endDate, goodsId, userId);
+	public List<Map> statSalesByMonth(String startDate, String endDate, Integer goodsId, Integer userId) {
+		return statMapper.statSalesByMonth(startDate, endDate, goodsId, userId);
 	}
 }

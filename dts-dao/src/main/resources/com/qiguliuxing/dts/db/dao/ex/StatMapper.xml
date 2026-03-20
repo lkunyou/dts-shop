@@ -29,48 +29,18 @@
         group by substr(add_time,1, 10)
     </select>
 
-    <!-- 按商品统计销售报表 -->
-    <select id="statSaleByGoods" resultType="map">
+    <select id="statSalesByGoods" resultType="map">
         select
-        g.id as goods_id,
-        g.name as goods_name,
         substr(o.add_time,1,10) as day,
-        sum(og.number) as sales_volume,
-        sum(og.number * og.price) as order_amount
+        og.goods_id as goodsId,
+        og.goods_name as goodsName,
+        sum(og.number) as salesCount,
+        sum(og.number * og.price) as amount
         from dts_order o
         inner join dts_order_goods og on o.id = og.order_id
-        inner join dts_goods g on og.goods_id = g.id
-        where o.order_status in(201, 301, 401, 402)
+        where o.order_status in (201, 301, 401, 402)
         <if test="startDate != null and startDate != ''">
-            and substr(o.add_time,1,10) >= #{startDate}
-        </if>
-        <if test="endDate != null and endDate != ''">
-            and substr(o.add_time,1,10) &lt;= #{endDate}
-        </if>
-        <if test="goodsId != null">
-            and g.id = #{goodsId}
-        </if>
-        <if test="userId != null">
-            and o.user_id = #{userId}
-        </if>
-        group by g.id, g.name, substr(o.add_time,1,10)
-        order by day desc, order_amount desc
-    </select>
-
-    <!-- 按用户统计销售报表 -->
-    <select id="statSaleByUser" resultType="map">
-        select
-        u.id as user_id,
-        u.username as user_name,
-        substr(o.add_time,1,10) as day,
-        sum(og.number) as sales_volume,
-        sum(og.number * og.price) as order_amount
-        from dts_order o
-        inner join dts_order_goods og on o.id = og.order_id
-        inner join dts_user u on o.user_id = u.id
-        where o.order_status in(201, 301, 401, 402)
-        <if test="startDate != null and startDate != ''">
-            and substr(o.add_time,1,10) >= #{startDate}
+            and substr(o.add_time,1,10) &gt;= #{startDate}
         </if>
         <if test="endDate != null and endDate != ''">
             and substr(o.add_time,1,10) &lt;= #{endDate}
@@ -79,23 +49,49 @@
             and og.goods_id = #{goodsId}
         </if>
         <if test="userId != null">
-            and u.id = #{userId}
+            and o.user_id = #{userId}
         </if>
-        group by u.id, u.username, substr(o.add_time,1,10)
-        order by day desc, order_amount desc
+        group by substr(o.add_time,1,10), og.goods_id, og.goods_name
+        order by day desc, amount desc
     </select>
 
-    <!-- 按月份统计销售报表 -->
-    <select id="statSaleByMonth" resultType="map">
+    <select id="statSalesByUser" resultType="map">
         select
-        substr(o.add_time,1,7) as month,
-        sum(og.number) as sales_volume,
-        sum(og.number * og.price) as order_amount
+        substr(o.add_time,1,10) as day,
+        o.user_id as userId,
+        u.username as username,
+        sum(og.number) as salesCount,
+        sum(og.number * og.price) as amount
         from dts_order o
         inner join dts_order_goods og on o.id = og.order_id
-        where o.order_status in(201, 301, 401, 402)
+        inner join dts_user u on o.user_id = u.id
+        where o.order_status in (201, 301, 401, 402)
         <if test="startDate != null and startDate != ''">
-            and substr(o.add_time,1,10) >= #{startDate}
+            and substr(o.add_time,1,10) &gt;= #{startDate}
+        </if>
+        <if test="endDate != null and endDate != ''">
+            and substr(o.add_time,1,10) &lt;= #{endDate}
+        </if>
+        <if test="goodsId != null">
+            and og.goods_id = #{goodsId}
+        </if>
+        <if test="userId != null">
+            and o.user_id = #{userId}
+        </if>
+        group by substr(o.add_time,1,10), o.user_id, u.username
+        order by day desc, amount desc
+    </select>
+
+    <select id="statSalesByMonth" resultType="map">
+        select
+        substr(o.add_time,1,7) as month,
+        sum(og.number) as salesCount,
+        sum(og.number * og.price) as amount
+        from dts_order o
+        inner join dts_order_goods og on o.id = og.order_id
+        where o.order_status in (201, 301, 401, 402)
+        <if test="startDate != null and startDate != ''">
+            and substr(o.add_time,1,10) &gt;= #{startDate}
         </if>
         <if test="endDate != null and endDate != ''">
             and substr(o.add_time,1,10) &lt;= #{endDate}

@@ -77,90 +77,66 @@ public class AdminStatController {
 		return ResponseUtil.ok(statVo);
 	}
 
-	/**
-	 * 按商品统计销售报表
-	 * @param startDate 开始日期(yyyy-MM-dd)
-	 * @param endDate 结束日期(yyyy-MM-dd)
-	 * @param goodsId 商品ID(可选)
-	 * @param userId 用户ID(可选)
-	 * @return 商品销售统计数据
-	 */
-	@RequiresPermissions("admin:stat:sale:goods")
+	@RequiresPermissions("admin:stat:sales")
 	@RequiresPermissionsDesc(menu = { "统计管理", "销售报表" }, button = "按商品统计")
-	@GetMapping("/sale/goods")
-	public Object statSaleByGoods(
+	@GetMapping("/sales/goods")
+	public Object statSalesByGoods(
 			@RequestParam(required = false) String startDate,
 			@RequestParam(required = false) String endDate,
 			@RequestParam(required = false) Integer goodsId,
 			@RequestParam(required = false) Integer userId) {
-		logger.info("【请求开始】统计管理->销售报表->按商品统计->查询,参数: startDate={}, endDate={}, goodsId={}, userId={}",
+		logger.info("【请求开始】统计管理->销售报表->按商品统计,参数:startDate={},endDate={},goodsId={},userId={}",
 				startDate, endDate, goodsId, userId);
 
-		List<Map> rows = statService.statSaleByGoods(startDate, endDate, goodsId, userId);
-		String[] columns = new String[] { "goods_id", "goods_name", "day", "sales_volume", "order_amount" };
+		List<Map> rows = statService.statSalesByGoods(startDate, endDate, goodsId, userId);
+		String[] columns = new String[] { "day", "goodsId", "goodsName", "salesCount", "amount" };
 		StatVo statVo = new StatVo();
 		statVo.setColumns(columns);
 		statVo.setRows(rows);
 
-		logger.info("【请求结束】统计管理->销售报表->按商品统计->查询");
+		logger.info("【请求结束】统计管理->销售报表->按商品统计,响应结果:{}", JSONObject.toJSONString(statVo));
 		return ResponseUtil.ok(statVo);
 	}
 
-	/**
-	 * 按用户统计销售报表
-	 * @param startDate 开始日期(yyyy-MM-dd)
-	 * @param endDate 结束日期(yyyy-MM-dd)
-	 * @param goodsId 商品ID(可选)
-	 * @param userId 用户ID(可选)
-	 * @return 用户销售统计数据
-	 */
-	@RequiresPermissions("admin:stat:sale:user")
+	@RequiresPermissions("admin:stat:sales")
 	@RequiresPermissionsDesc(menu = { "统计管理", "销售报表" }, button = "按用户统计")
-	@GetMapping("/sale/user")
-	public Object statSaleByUser(
+	@GetMapping("/sales/user")
+	public Object statSalesByUser(
 			@RequestParam(required = false) String startDate,
 			@RequestParam(required = false) String endDate,
 			@RequestParam(required = false) Integer goodsId,
 			@RequestParam(required = false) Integer userId) {
-		logger.info("【请求开始】统计管理->销售报表->按用户统计->查询,参数: startDate={}, endDate={}, goodsId={}, userId={}",
+		logger.info("【请求开始】统计管理->销售报表->按用户统计,参数:startDate={},endDate={},goodsId={},userId={}",
 				startDate, endDate, goodsId, userId);
 
-		List<Map> rows = statService.statSaleByUser(startDate, endDate, goodsId, userId);
-		String[] columns = new String[] { "user_id", "user_name", "day", "sales_volume", "order_amount" };
+		List<Map> rows = statService.statSalesByUser(startDate, endDate, goodsId, userId);
+		String[] columns = new String[] { "day", "userId", "username", "salesCount", "amount" };
 		StatVo statVo = new StatVo();
 		statVo.setColumns(columns);
 		statVo.setRows(rows);
 
-		logger.info("【请求结束】统计管理->销售报表->按用户统计->查询");
+		logger.info("【请求结束】统计管理->销售报表->按用户统计,响应结果:{}", JSONObject.toJSONString(statVo));
 		return ResponseUtil.ok(statVo);
 	}
 
-	/**
-	 * 按月份统计销售报表
-	 * @param startDate 开始日期(yyyy-MM-dd)
-	 * @param endDate 结束日期(yyyy-MM-dd)
-	 * @param goodsId 商品ID(可选)
-	 * @param userId 用户ID(可选)
-	 * @return 月份销售统计数据
-	 */
-	@RequiresPermissions("admin:stat:sale:month")
+	@RequiresPermissions("admin:stat:sales")
 	@RequiresPermissionsDesc(menu = { "统计管理", "销售报表" }, button = "按月份统计")
-	@GetMapping("/sale/month")
-	public Object statSaleByMonth(
+	@GetMapping("/sales/month")
+	public Object statSalesByMonth(
 			@RequestParam(required = false) String startDate,
 			@RequestParam(required = false) String endDate,
 			@RequestParam(required = false) Integer goodsId,
 			@RequestParam(required = false) Integer userId) {
-		logger.info("【请求开始】统计管理->销售报表->按月份统计->查询,参数: startDate={}, endDate={}, goodsId={}, userId={}",
+		logger.info("【请求开始】统计管理->销售报表->按月份统计,参数:startDate={},endDate={},goodsId={},userId={}",
 				startDate, endDate, goodsId, userId);
 
-		List<Map> rows = statService.statSaleByMonth(startDate, endDate, goodsId, userId);
-		String[] columns = new String[] { "month", "sales_volume", "order_amount" };
+		List<Map> rows = statService.statSalesByMonth(startDate, endDate, goodsId, userId);
+		String[] columns = new String[] { "month", "salesCount", "amount" };
 		StatVo statVo = new StatVo();
 		statVo.setColumns(columns);
 		statVo.setRows(rows);
 
-		logger.info("【请求结束】统计管理->销售报表->按月份统计->查询");
+		logger.info("【请求结束】统计管理->销售报表->按月份统计,响应结果:{}", JSONObject.toJSONString(statVo));
 		return ResponseUtil.ok(statVo);
 	}
 
