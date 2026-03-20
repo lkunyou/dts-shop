@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.qiguliuxing.dts.db.dao.ex.CouponUserMapper">
+
+    <!--
+        使用优惠券（带乐观锁，防止优惠券被多用）
+        更新条件精确匹配：用户ID、优惠券ID、状态为可用、未删除
+    -->
+    <update id="useCoupon" parameterType="map">
+        UPDATE dts_coupon_user
+        SET `status` = #{status,jdbcType=SMALLINT},
+            used_time = #{usedTime,jdbcType=TIMESTAMP},
+            order_sn = #{orderSn,jdbcType=VARCHAR},
+            update_time = #{updateTime,jdbcType=TIMESTAMP}
+        WHERE user_id = #{userId,jdbcType=INTEGER}
+          AND coupon_id = #{couponId,jdbcType=INTEGER}
+          AND `status` = 1
+          AND deleted = 0
+    </update>
+
+</mapper>
