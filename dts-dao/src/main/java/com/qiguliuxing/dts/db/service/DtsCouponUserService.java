@@ -2,6 +2,7 @@ package com.qiguliuxing.dts.db.service;
 
 import com.github.pagehelper.PageHelper;
 import com.qiguliuxing.dts.db.dao.DtsCouponUserMapper;
+import com.qiguliuxing.dts.db.dao.ex.CouponUserMapperEx;
 import com.qiguliuxing.dts.db.domain.DtsCouponUser;
 import com.qiguliuxing.dts.db.domain.DtsCouponUserExample;
 import com.qiguliuxing.dts.db.util.CouponUserConstant;
@@ -19,6 +20,8 @@ import java.util.List;
 public class DtsCouponUserService {
 	@Resource
 	private DtsCouponUserMapper couponUserMapper;
+	@Resource
+	private CouponUserMapperEx couponUserMapperEx;
 
 	public Integer countCoupon(Integer couponId) {
 		DtsCouponUserExample example = new DtsCouponUserExample();
@@ -88,6 +91,37 @@ public class DtsCouponUserService {
 	public int update(DtsCouponUser couponUser) {
 		couponUser.setUpdateTime(LocalDateTime.now());
 		return couponUserMapper.updateByPrimaryKeySelective(couponUser);
+	}
+
+	/**
+	 * 原子性使用优惠券（防止并发超用）
+	 * 通过精确参数匹配更新，确保只更新一条可用的优惠券记录
+	 * 不使用模糊的Example查询条件，直接通过参数绑定进行精确更新
+	 * 
+	 * @param userId 用户ID
+	 * @param couponId 优惠券ID
+	 * @param orderSn 订单编号
+	 * @return 是否更新成功
+	 */
+	public boolean tryUseCoupon(Integer userId, Integer couponId, String orderSn) {
+		// 先查询一条可用的优惠券记录
+		List<DtsCouponUser> couponUserList = queryList(userId, couponId, CouponUserConstant.STATUS_USABLE, 1, 1, "add_time", "desc");
+		if (couponUserList.isEmpty()) {
+			return false;
+		}
+		
+		DtsCouponUser couponUser = couponUserList.get(0);
+		
+		// 通过扩展Mapper使用精确参数更新，条件：id匹配 AND status是可用状态 AND 未删除
+		int count = couponUserMapperEx.updateCouponStatus(
+				couponUser.getId(),
+				CouponUserConstant.STATUS_USABLE,
+				CouponUserConstant.STATUS_USED,
+				orderSn,
+				LocalDateTime.now(),
+				LocalDateTime.now());
+		
+		return count > 0;
 	}
 
 	public List<DtsCouponUser> queryExpired() {
